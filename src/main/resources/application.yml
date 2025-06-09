@@ -1,25 +1,93 @@
 spring:
   application:
     name: spring-ai-alibaba-chat
-  ai:
-    dashscope:
-      # 阿里云通义模型API Key
-      api-key: ${AI_DASHSCOPE_API_KEY}  # 从环境变量获取API Key
-#      chat:
-#        options:
-#          model: qwen-plus  # 通义千问模型: qwen-turbo, qwen-plus, qwen-max
-#          temperature: 0.7  # 创造性程度 0.0-1.0
-#          top-p: 0.8        # 核采样参数
 
-# HTTP客户端超时配置
+  # 数据库配置 (PGVector)
+  datasource:
+    url: jdbc:postgresql://localhost:5432/ai_knowledge_db
+    username: ${DB_USERNAME:postgres}
+    password: ${DB_PASSWORD:postgres}
+    driver-class-name: org.postgresql.Driver
+
+  # JPA配置
+  jpa:
+    hibernate:
+      ddl-auto: update
+    show-sql: false
+    database-platform: org.hibernate.dialect.PostgreSQLDialect
+
+  ai:
+    # 阿里云通义模型配置
+    dashscope:
+      api-key: ${AI_DASHSCOPE_API_KEY}  # 从环境变量获取API Key
+      chat:
+        options:
+          model: qwen-plus  # 通义千问模型: qwen-turbo, qwen-plus, qwen-max
+          temperature: 0.7  # 创造性程度 0.0-1.0
+          top-p: 0.8        # 核采样参数
+
+    # OpenAI Embedding模型配置 (用于生成向量嵌入)
+    openai:
+      api-key: ${OPENAI_API_KEY}  # 从环境变量获取OpenAI API Key
+      embedding:
+        options:
+          model: text-embedding-3-small  # 使用性价比较高的embedding模型
+          dimensions: 1536
+
+    # 向量存储配置 (PGVector)
+    vectorstore:
+      pgvector:
+        index-type: HNSW              # 索引类型：HNSW、IVFFlat
+        distance-type: COSINE_DISTANCE # 距离计算方式：COSINE_DISTANCE、EUCLIDEAN_DISTANCE、INNER_PRODUCT
+        dimensions: 1536              # 向量维度，需要与embedding模型维度一致
+        initialize-schema: true       # 自动初始化数据库schema
+        max-document-batch-size: 1000 # 批量处理文档的最大数量
+
+  # HTTP客户端超时配置
   http:
     client:
       timeout:
         connection: 30000      # 连接超时 30秒
         read: 60000           # 读取超时 60秒
 
+  # 多部分文件上传配置 (支持文档上传)
+  servlet:
+    multipart:
+      max-file-size: 10MB
+      max-request-size: 10MB
+
 # 日志配置
 logging:
   level:
     com.example: DEBUG
     com.alibaba.cloud.ai: DEBUG
+    org.springframework.ai: DEBUG
+    org.springframework.ai.vectorstore: DEBUG
+    org.springframework.ai.embedding: DEBUG
+
+# 应用自定义配置
+app:
+  rag:
+    similarity-threshold: 0.75    # RAG检索相似度阈值
+    top-k: 5                     # 检索返回文档数量
+    chunk-size: 1000             # 文档分块大小
+    chunk-overlap: 200           # 分块重叠大小
+    enable-rewrite-query: true   # 是否启用查询重写
+    document-storage-path: "documents/" # 文档存储路径
+
+  # 支持的文档类型
+  supported-document-types:
+    - "pdf"
+    - "txt"
+    - "md"
+    - "docx"
+
+# 管理端点配置 (便于监控)
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,env
+  endpoint:
+    health:
+      show-details: when_authorized
